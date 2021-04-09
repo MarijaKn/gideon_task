@@ -1,0 +1,3 @@
+/home/mknezevi/Downloads/search_j/gideon_task/CMakeFiles/rebuild_cache.dir
+/home/mknezevi/Downloads/search_j/gideon_task/CMakeFiles/ImageProcessing.dir
+/home/mknezevi/Downloads/search_j/gideon_task/CMakeFiles/edit_cache.dir
