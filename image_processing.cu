@@ -22,23 +22,21 @@ __device__ unsigned char y_component (unsigned char b, unsigned char g, unsigned
     return y;
 }
 
-// u_component
-__device__ unsigned char cr_component (unsigned char y, unsigned char r, unsigned char delta) {
+__device__ unsigned char u_component (unsigned char y, unsigned char r, unsigned char delta) {
 
     unsigned char cr = (r - y) * 0.713 + delta;
 
     return cr;
 }
 
-// y component
-__device__ unsigned char cb_component (unsigned char y, unsigned char b, unsigned char delta) {
+__device__ unsigned char v_component (unsigned char y, unsigned char b, unsigned char delta) {
 
     unsigned char cb = (b - y) * 0.564 + delta;
 
     return cb;
 }
 
-__global__ void bgr2ycrcb (uchar3 *d_in, unsigned char *d_out, unsigned int imgwidth, unsigned int imgheight) {
+__global__ void bgr2yuv444 (uchar3 *d_in, unsigned char *d_out, unsigned int imgwidth, unsigned int imgheight) {
 
     int column_idx = blockIdx.x*blockDim.x+threadIdx.x;
     int row_idx = blockIdx.y*blockDim.y+threadIdx.y;
@@ -57,43 +55,42 @@ __global__ void bgr2ycrcb (uchar3 *d_in, unsigned char *d_out, unsigned int imgw
 
     unsigned char delta = 128;
 
-    // In YUV444 every thread reproduces 3 otuputs, y u and v component
-    // for (int i = 0; i < 3; i++) {
+    // In YUV444 every pixel has each of 3 components
+    // Each pixel (global idx) reproduces 3 components on output and they are interspersed with each other
 
-    //     unsigned char value = 0;
-    //     unsigned char y = y_component(b, g, r);
+    unsigned char y = y_component(b, g, r);
 
-    //     if (i == 0) {
-    //         value = y;
-    //     } else if (i == 1) {
-    //         value = cr_component(y, r, delta);
-    //     } else {
-    //         value = cb_component(y, b, delta);
-    //     }
-
-    //     d_out[3 * global_idx + i] = value;
-    // }
-
-    for (int i = 0; i < 2; i++) {
-
-        unsigned char value = 0;
-        unsigned char y = y_component(b, g, r);
-
-        if (i == 1) {
-            value = y;
-        } else {
-
-            if (global_idx % 2 == 0) {
-                value = cr_component(y, r, delta);
-            } else if (global_idx % 2 == 1) {
-                value = cb_component(y, b, delta);
-            }
-        }
-
-        d_out[2 * global_idx + i] = value;
-    }
+    d_out[3 * global_idx]       = y;
+    d_out[3 * global_idx + 1]   = u_component(y, r, delta);
+    d_out[3 * global_idx + 2]   = v_component(y, b, delta);
 }
 
+__global__ void yuv444toyuv422 (unsigned char *d_in, unsigned char *d_out, unsigned int img_size) {
+
+    int global_idx = blockIdx.x*blockDim.x+threadIdx.x;
+
+    if (global_idx > img_size) {
+        return;
+    }
+
+    int y_in_idx  = 3 * global_idx;
+    int u_in_idx  = y_in_idx + 1;
+    int v_in_idx  = y_in_idx + 2;
+
+    int y_out_idx = 2 * global_idx;
+    int u_out_idx = 2 * y_out_idx + 1;
+    int v_out_idx = 2 * y_out_idx + 3;
+
+    d_out[y_out_idx] = d_in[y_in_idx];
+    d_out[u_out_idx] = d_in[u_in_idx];
+    d_out[v_out_idx] = d_in[v_in_idx];
+
+    // if (global_idx < 20) {
+    //     printf("global_idx = %d | y_in_idx = %d, u_in_idx = %d, v_in_idx = %d | y_out_idx = %d, u_out_idx = %d, v_out_idx = %d\n",
+    //             global_idx, y_in_idx, u_in_idx, v_in_idx, y_out_idx, u_out_idx, v_out_idx);
+    // }
+
+}
 
 int main()
 {
@@ -117,19 +114,13 @@ int main()
     cout << "Image height  =  " << imgheight << endl;
     cout << "Image width   =  "  << imgwidth << endl;
 
-    // This means object Mat was created, a simple image containter
-    // Image dimensions imgheight x imagewidth
-    // CV_8UC3 means we use unsigned char types that are 8 bit long and each pixel has three of these to form the three channels
-    // The cv::Scalar is four element short vector. Specify it and you can initialize all matrix points with a custom value
-    Mat output_image = Mat(imgheight, imgwidth, CV_8UC3, Scalar::all(0));
-
     // Define input and output
     uchar3 *d_in;
-    unsigned char *d_out;
+    unsigned char *d_out_yuv444;
 
     // Allocate device memory for input and output
     cudaMalloc((void**)&d_in, imgheight*imgwidth*sizeof(uchar3));
-    cudaMalloc((void**)&d_out, imgheight*imgwidth*sizeof(unsigned char) * 2);
+    cudaMalloc((void**)&d_out_yuv444, imgheight*imgwidth*sizeof(unsigned char) * 3);
 
     cudaMemcpy(d_in, img.data, imgheight*imgwidth*sizeof(uchar3), cudaMemcpyHostToDevice);
 
@@ -140,7 +131,7 @@ int main()
     clock_t start, end;
     start = clock();
 
-    bgr2ycrcb<<<blocksPerGrid, threadsPerBlock>>>(d_in, d_out, imgwidth, imgheight);
+    bgr2yuv444<<<blocksPerGrid, threadsPerBlock>>>(d_in, d_out_yuv444, imgwidth, imgheight);
     cudaDeviceSynchronize();
 
     end = clock();
@@ -148,16 +139,43 @@ int main()
     double gpu_time = (double) (end-start) / CLOCKS_PER_SEC;
     cout.precision(12);
 
-    cout << "Execution time of bgr2ycrcb kernel is:  "<< gpu_time << " sec." << endl;
+    cout << "Execution time of bgr2yuv444 kernel is:  "<< gpu_time << " sec." << endl;
 
-    cudaMemcpy(output_image.data, d_out, imgheight*imgwidth*sizeof(unsigned char) * 2, cudaMemcpyDeviceToHost);
+    unsigned char *d_out_yuv422;
+    cudaMalloc((void**)&d_out_yuv422, imgheight*imgwidth*sizeof(unsigned char) * 2);
+
+    unsigned int n_threads = 32;
+    unsigned int n_blocks = (unsigned int) ceil((floor) (imgwidth * imgheight) / n_threads);
+
+    cout << "n_threads = " << n_threads  << endl;
+    cout << "n_blocks = " << n_blocks << endl;
+
+    start = clock();
+
+    yuv444toyuv422<<<n_blocks, n_threads>>>(d_out_yuv444, d_out_yuv422, imgwidth*imgheight);
+
+    end = clock();
+
+    gpu_time = (double) (end-start) / CLOCKS_PER_SEC;
+    cout.precision(12);
+
+    cout << "Execution time of yuv444toyuv422 kernel is:  "<< gpu_time << " sec." << endl;
+
+    Mat output_image = Mat(imgheight, imgwidth, CV_8UC2, Scalar(255));
+    Mat final_image = Mat(imgheight, imgwidth, CV_8UC3, Scalar(255));
+
+    cudaMemcpy(output_image.data, d_out_yuv422, imgheight*imgwidth*sizeof(unsigned char) * 2, cudaMemcpyDeviceToHost);
+
+    cvtColor(output_image, final_image, COLOR_YUV2BGR_UYVY, 3);
+
+    // Show image
+    imshow("Output YUV422 image", final_image);
+    k = waitKey(0);
 
     cudaFree(d_in);
-    cudaFree(d_out);
+    cudaFree(d_out_yuv444);
+    cudaFree(d_out_yuv422);
 
-    // Show output image
-    imshow("YUV420 image", output_image);
-    k = waitKey(0);
 
     return 0;
 }
