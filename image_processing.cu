@@ -36,6 +36,7 @@ __device__ unsigned char v_component (unsigned char y, unsigned char b, unsigned
     return cb;
 }
 
+// Output byte order: Y0U0V0 Y1U1V1 Y2U2V2 Y3U3V3 etc.
 __global__ void bgr2yuv444 (uchar3 *d_in, unsigned char *d_out, unsigned int imgwidth, unsigned int imgheight) {
 
     int column_idx = blockIdx.x*blockDim.x+threadIdx.x;
@@ -49,9 +50,9 @@ __global__ void bgr2yuv444 (uchar3 *d_in, unsigned char *d_out, unsigned int img
 
     unsigned char b, g, r = 0;
 
-    b = d_in[global_idx].x;
+    b = d_in[global_idx].z;
     g = d_in[global_idx].y;
-    r = d_in[global_idx].z;
+    r = d_in[global_idx].x;
 
     unsigned char delta = 128;
 
@@ -65,6 +66,8 @@ __global__ void bgr2yuv444 (uchar3 *d_in, unsigned char *d_out, unsigned int img
     d_out[3 * global_idx + 2]   = v_component(y, b, delta);
 }
 
+
+// Output byte order: U0Y0V0 Y1 U2Y2V2 Y3 etc.
 __global__ void yuv444toyuv422 (unsigned char *d_in, unsigned char *d_out, unsigned int img_size) {
 
     int global_idx = blockIdx.x*blockDim.x+threadIdx.x;
@@ -73,29 +76,85 @@ __global__ void yuv444toyuv422 (unsigned char *d_in, unsigned char *d_out, unsig
         return;
     }
 
-    int y_in_idx  = 3 * global_idx;
-    int u_in_idx  = y_in_idx + 1;
-    int v_in_idx  = y_in_idx + 2;
+    int y_in_idx, y_out_idx;
 
-    int y_out_idx = 2 * global_idx;
-    int u_out_idx = 2 * y_out_idx + 1;
-    int v_out_idx = 2 * y_out_idx + 3;
+    if (global_idx % 2 == 0) {
 
-    d_out[y_out_idx] = d_in[y_in_idx];
-    d_out[u_out_idx] = d_in[u_in_idx];
-    d_out[v_out_idx] = d_in[v_in_idx];
+        y_in_idx = 3 * global_idx;
+        int u_in_idx = 3 * global_idx + 1;
+        int v_in_idx = 3 * global_idx + 2;
 
-    // if (global_idx < 20) {
-    //     printf("global_idx = %d | y_in_idx = %d, u_in_idx = %d, v_in_idx = %d | y_out_idx = %d, u_out_idx = %d, v_out_idx = %d\n",
-    //             global_idx, y_in_idx, u_in_idx, v_in_idx, y_out_idx, u_out_idx, v_out_idx);
-    // }
+        y_out_idx = 2 * global_idx + 1;
+        int u_out_idx = 2 * global_idx;
+        int v_out_idx = 2 * global_idx + 2;
 
+        d_out[u_out_idx] = d_in[u_in_idx];
+        d_out[y_out_idx] = d_in[y_in_idx];
+        d_out[v_out_idx] = d_in[v_in_idx];
+
+        if (global_idx < 10) {
+            printf("global_idx = %d | y_in_idx = %d, u_in_idx = %d, v_in_idx = %d | u_out_idx = %d, y_out_idx = %d, v_out_idx = %d\n",
+                    global_idx, y_in_idx, u_in_idx, v_in_idx, u_out_idx, y_out_idx, v_out_idx);
+        }
+
+    } else {
+
+        y_in_idx  = 3 * global_idx;
+        y_out_idx = y_in_idx - (global_idx - 1);
+
+        d_out[y_out_idx] = d_in[y_in_idx];
+
+        if (global_idx < 10) {
+            printf("global_idx = %d | y_in_idx = %d | y_out_idx = %d\n",
+                    global_idx, y_in_idx, y_out_idx);
+        }
+
+    }
+
+}
+
+__global__ void extract_channels (unsigned char *d_in, unsigned char *y_out, unsigned char *u_out, unsigned char *v_out,
+    unsigned int img_size) {
+
+    int global_idx = blockIdx.x*blockDim.x+threadIdx.x;
+
+    if (global_idx > img_size) {
+        return;
+    }
+
+    // Y channel
+    int y_in_idx;
+
+    if (global_idx % 2 == 0) {
+
+        y_in_idx = 2 * global_idx + 1;
+
+        int u_in_idx = 2 * global_idx;
+        int v_in_idx = 2 * global_idx + 2;
+
+        int uv_out_idx = u_in_idx / 4;
+
+        u_out[uv_out_idx] = d_in[u_in_idx];
+        v_out[uv_out_idx] = d_in[v_in_idx];
+
+        if (global_idx < 10) {
+            printf("global_idx = %d | v_in_idx = %d, v_out_idx = %d\n", global_idx, v_in_idx, uv_out_idx);
+        }
+
+    } else {
+
+        y_in_idx = 3 * global_idx - (global_idx - 1);
+    }
+
+    y_out[global_idx] = d_in[y_in_idx];
 }
 
 int main()
 {
     string image_path = "gideon_task/image_512x384.png";
-    Mat img = imread(image_path, IMREAD_COLOR);
+    // string image_path = "gideon_task/red.png";
+
+    Mat img = imread(image_path);
 
     // Check whether the image is imported correctly
     if(img.empty())
@@ -161,16 +220,51 @@ int main()
 
     cout << "Execution time of yuv444toyuv422 kernel is:  "<< gpu_time << " sec." << endl;
 
-    Mat output_image = Mat(imgheight, imgwidth, CV_8UC2, Scalar(255));
-    Mat final_image = Mat(imgheight, imgwidth, CV_8UC3, Scalar(255));
+    Mat output_image(imgheight, imgwidth, CV_8UC2);
+    Mat final_image(imgheight, imgwidth, CV_8UC3);
 
     cudaMemcpy(output_image.data, d_out_yuv422, imgheight*imgwidth*sizeof(unsigned char) * 2, cudaMemcpyDeviceToHost);
 
-    cvtColor(output_image, final_image, COLOR_YUV2BGR_UYVY, 3);
+    cvtColor(output_image, final_image, CV_YUV2BGR_UYVY);
 
     // Show image
     imshow("Output YUV422 image", final_image);
     k = waitKey(0);
+
+    unsigned char *d_y_channel;
+    cudaMalloc((void**)&d_y_channel, imgheight*imgwidth*sizeof(unsigned char));
+
+    unsigned char *d_u_channel;
+    cudaMalloc((void**)&d_u_channel, imgheight*imgwidth*sizeof(unsigned char));
+
+    unsigned char *d_v_channel;
+    cudaMalloc((void**)&d_v_channel, imgheight*imgwidth*sizeof(unsigned char));
+
+    start = clock();
+
+    extract_channels<<<n_blocks, n_threads>>>(d_out_yuv422, d_y_channel, d_u_channel, d_v_channel, imgwidth*imgheight);
+
+    end = clock();
+
+    cout << "Execution time of extract_channels kernel is:  "<< gpu_time << " sec." << endl;
+
+    Mat output_channels(imgheight, imgwidth, CV_8UC1);
+    cudaMemcpy(output_channels.data, d_y_channel, imgheight*imgwidth*sizeof(unsigned char), cudaMemcpyDeviceToHost);
+
+    // Show image
+    imshow("Y channel", output_channels);
+    k = waitKey(0);
+
+    Mat output_channels_1(imgheight, 0.5 * imgwidth, CV_8UC1);
+
+    cudaMemcpy(output_channels_1.data, d_u_channel, 0.5 * imgheight*imgwidth*sizeof(unsigned char), cudaMemcpyDeviceToHost);
+    imshow("U channel", output_channels_1);
+    k = waitKey(0);
+
+    cudaMemcpy(output_channels_1.data, d_v_channel, 0.5 * imgheight*imgwidth*sizeof(unsigned char), cudaMemcpyDeviceToHost);
+    imshow("V channel", output_channels_1);
+    k = waitKey(0);
+
 
     cudaFree(d_in);
     cudaFree(d_out_yuv444);
