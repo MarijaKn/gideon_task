@@ -123,32 +123,32 @@ ImageProcessing/fast:
 	$(MAKE) -f CMakeFiles/ImageProcessing.dir/build.make CMakeFiles/ImageProcessing.dir/build
 .PHONY : ImageProcessing/fast
 
-image_processing.o: image_processing.cpp.o
+src/image_processing.o: src/image_processing.cu.o
 
-.PHONY : image_processing.o
+.PHONY : src/image_processing.o
 
 # target to build an object file
-image_processing.cpp.o:
-	$(MAKE) -f CMakeFiles/ImageProcessing.dir/build.make CMakeFiles/ImageProcessing.dir/image_processing.cpp.o
-.PHONY : image_processing.cpp.o
+src/image_processing.cu.o:
+	$(MAKE) -f CMakeFiles/ImageProcessing.dir/build.make CMakeFiles/ImageProcessing.dir/src/image_processing.cu.o
+.PHONY : src/image_processing.cu.o
 
-image_processing.i: image_processing.cpp.i
+src/image_processing.i: src/image_processing.cu.i
 
-.PHONY : image_processing.i
+.PHONY : src/image_processing.i
 
 # target to preprocess a source file
-image_processing.cpp.i:
-	$(MAKE) -f CMakeFiles/ImageProcessing.dir/build.make CMakeFiles/ImageProcessing.dir/image_processing.cpp.i
-.PHONY : image_processing.cpp.i
+src/image_processing.cu.i:
+	$(MAKE) -f CMakeFiles/ImageProcessing.dir/build.make CMakeFiles/ImageProcessing.dir/src/image_processing.cu.i
+.PHONY : src/image_processing.cu.i
 
-image_processing.s: image_processing.cpp.s
+src/image_processing.s: src/image_processing.cu.s
 
-.PHONY : image_processing.s
+.PHONY : src/image_processing.s
 
 # target to generate assembly for a file
-image_processing.cpp.s:
-	$(MAKE) -f CMakeFiles/ImageProcessing.dir/build.make CMakeFiles/ImageProcessing.dir/image_processing.cpp.s
-.PHONY : image_processing.cpp.s
+src/image_processing.cu.s:
+	$(MAKE) -f CMakeFiles/ImageProcessing.dir/build.make CMakeFiles/ImageProcessing.dir/src/image_processing.cu.s
+.PHONY : src/image_processing.cu.s
 
 # Help Target
 help:
@@ -159,9 +159,9 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... ImageProcessing"
 	@echo "... edit_cache"
-	@echo "... image_processing.o"
-	@echo "... image_processing.i"
-	@echo "... image_processing.s"
+	@echo "... src/image_processing.o"
+	@echo "... src/image_processing.i"
+	@echo "... src/image_processing.s"
 .PHONY : help
 
 
