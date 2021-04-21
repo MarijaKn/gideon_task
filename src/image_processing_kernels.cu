@@ -1,4 +1,13 @@
-//NOTE sa objasnjenjem sta se razlikuje od standarda + link na objasnjenje
+// NOTE: The conversion formulas I used are those from the task text.
+// I can notice that identical formulas are found on wikipedia as well.
+// However, after using these formulas in the kernel and then converting using the OpenCV cvrColor function,
+// I noticed that my resulting BGR image is a good size, however very blue-ish.
+// It seemed to me that I had read one of the BGR components incorrectly.
+// Then I noticed that by replacing the B and R channels in the kernel I get the correct BGR image after using cvrColor.
+
+// I think the conversion formulas are correct, and what I assume could be a problem is the OpenCV cvrColor conversion function.
+// Finally, I checked my version of OpenCV, and it seems to have some issues:
+// https://github.com/opencv/opencv/issues/4946
 
 __device__ unsigned char y_component (unsigned char b, unsigned char g, unsigned char r) {
 
@@ -56,7 +65,7 @@ __global__ void bgr2yuv444 (uchar3 *d_in, unsigned char *d_out, unsigned int img
 
     unsigned char b, g, r = 0;
 
-    // TU KOMENTAR O ZAMJENI
+    // Note: Here is the swapping of B and R component I mentioned at the top of this file
     b = d_in[global_idx].z;
     g = d_in[global_idx].y;
     r = d_in[global_idx].x;

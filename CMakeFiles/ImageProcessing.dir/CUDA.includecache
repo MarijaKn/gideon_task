@@ -8,6 +8,10 @@
 
 ./include/image_processing.cuh
 
+./include/image_processing.h
+
+/home/mknezevi/Downloads/search_j/gideon_task/src/image_processing.cpp
+
 /home/mknezevi/Downloads/search_j/gideon_task/src/image_processing.cu
 opencv2/core.hpp
 -
@@ -29,10 +33,14 @@ opencv2/highgui.hpp
 /home/mknezevi/Downloads/search_j/gideon_task/src/opencv2/highgui.hpp
 opencv2/opencv.hpp
 /home/mknezevi/Downloads/search_j/gideon_task/src/opencv2/opencv.hpp
-image_processing_kernels.cu
-/home/mknezevi/Downloads/search_j/gideon_task/src/image_processing_kernels.cu
+image_processing.h
+/home/mknezevi/Downloads/search_j/gideon_task/src/image_processing.h
 image_processing.cuh
 /home/mknezevi/Downloads/search_j/gideon_task/src/image_processing.cuh
+image_processing.cpp
+/home/mknezevi/Downloads/search_j/gideon_task/src/image_processing.cpp
+image_processing_kernels.cu
+/home/mknezevi/Downloads/search_j/gideon_task/src/image_processing_kernels.cu
 
 /home/mknezevi/Downloads/search_j/gideon_task/src/image_processing_kernels.cu
 

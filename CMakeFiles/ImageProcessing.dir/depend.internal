@@ -3,5 +3,7 @@
 
 CMakeFiles/ImageProcessing.dir/src/image_processing.cu.o
  ./include/image_processing.cuh
+ ./include/image_processing.h
+ /home/mknezevi/Downloads/search_j/gideon_task/src/image_processing.cpp
  /home/mknezevi/Downloads/search_j/gideon_task/src/image_processing.cu
  /home/mknezevi/Downloads/search_j/gideon_task/src/image_processing_kernels.cu
