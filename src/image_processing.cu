@@ -20,7 +20,7 @@ using namespace std;
 
 int main() {
 
-    string image_path = "./images/image_1024x768.png";
+    string image_path = "./images/image_720x540.png";
 
     Mat img = imread(image_path);
 
@@ -40,6 +40,8 @@ int main() {
 
     cout << "Image height  =  " << imgheight << endl;
     cout << "Image width   =  "  << imgwidth << endl;
+
+
 
     // BGR to YUV444
     uchar3 *d_in;
@@ -64,6 +66,9 @@ int main() {
     cout.precision(12);
     cout << "Execution time of bgr2yuv444 kernel is:  "<< gpu_time << " sec." << endl;
 
+
+
+
     /// YUV444 to YUV422
     unsigned char *d_out_yuv422;
     cudaMalloc((void**)&d_out_yuv422, imgheight*imgwidth*sizeof(unsigned char) * 2);
@@ -79,7 +84,7 @@ int main() {
     gpu_time = (double) (end-start) / CLOCKS_PER_SEC;
     cout << "Execution time of yuv444toyuv422 kernel is:  "<< gpu_time << " sec." << endl;
 
-    // COnversion to BGR using cvtColor in order to display/save the image
+    // Conversion to BGR using cvtColor in order to display/save the image
     Mat output_image(imgheight, imgwidth, CV_8UC2);
     Mat final_image(imgheight, imgwidth, CV_8UC3);
 
@@ -90,6 +95,9 @@ int main() {
     // Show image
     imshow("Output YUV422 image", final_image);
     k = waitKey(0);
+
+
+
 
     /// YUV422 to single separate channels
     unsigned char *d_y_channel;
@@ -126,6 +134,9 @@ int main() {
     cudaMemcpy(output_channels_1.data, d_v_channel, 0.5 * imgheight*imgwidth*sizeof(unsigned char), cudaMemcpyDeviceToHost);
     imshow("V channel", output_channels_1);
     k = waitKey(0);
+
+
+
 
     /// YUV422 to BGR
     uchar3 *d_out_bgr;

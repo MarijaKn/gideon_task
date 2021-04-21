@@ -1,3 +1,5 @@
+//NOTE sa objasnjenjem sta se razlikuje od standarda + link na objasnjenje
+
 __device__ unsigned char y_component (unsigned char b, unsigned char g, unsigned char r) {
 
     unsigned char y = 0.299 * r + 0.587 * g + 0.114 * b;
@@ -54,6 +56,7 @@ __global__ void bgr2yuv444 (uchar3 *d_in, unsigned char *d_out, unsigned int img
 
     unsigned char b, g, r = 0;
 
+    // TU KOMENTAR O ZAMJENI
     b = d_in[global_idx].z;
     g = d_in[global_idx].y;
     r = d_in[global_idx].x;
@@ -168,6 +171,8 @@ __global__ void yuv422tobgr (unsigned char *d_in, uchar3 *d_out_bgr, unsigned in
         y_in_idx = 3 * global_idx - (global_idx - 1);
 
         y = d_in[y_in_idx];
+        u = d_in[y_in_idx - 3];
+        v = d_in[y_in_idx - 1];
     }
 
     d_out_bgr[global_idx].z = b_component(y, v, delta);
