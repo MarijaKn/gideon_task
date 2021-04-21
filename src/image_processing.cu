@@ -18,7 +18,80 @@
 using namespace cv;
 using namespace std;
 
+double bgr_to_yuv444(uchar3 *d_in, unsigned char* d_out_yuv444, unsigned int imgheight, unsigned int imgwidth) {
+
+    // Set thread and grid size
+    dim3 threadsPerBlock(32, 32);
+    dim3 blocksPerGrid((imgwidth + threadsPerBlock.x - 1) / threadsPerBlock.x,
+        (imgheight + threadsPerBlock.y - 1) / threadsPerBlock.y);
+
+    clock_t start, end;
+    start = clock();
+    bgr2yuv444<<<blocksPerGrid, threadsPerBlock>>>(d_in, d_out_yuv444, imgwidth, imgheight);
+    cudaDeviceSynchronize();
+    end = clock();
+
+    double gpu_time = (double) (end-start) / CLOCKS_PER_SEC;
+
+    return gpu_time;
+}
+
+double yuv444_to_yuv422(unsigned char* d_out_yuv444, unsigned char* d_out_yuv422, unsigned int imgheight, unsigned int imgwidth) {
+
+    // Set thread and block size
+    unsigned int n_threads = 32;
+    unsigned int n_blocks = (unsigned int) ceil((floor) (imgwidth * imgheight) / n_threads);
+
+    clock_t start = clock();
+    yuv444toyuv422<<<n_blocks, n_threads>>>(d_out_yuv444, d_out_yuv422, imgwidth*imgheight);
+    cudaDeviceSynchronize();
+    clock_t end = clock();
+
+    double gpu_time = (double) (end-start) / CLOCKS_PER_SEC;
+
+    return gpu_time;
+}
+
+double extract_separate_channels(unsigned char* d_out_yuv422, unsigned char* d_y_channel, unsigned char* d_u_channel,
+    unsigned char* d_v_channel, unsigned int imgheight, unsigned int imgwidth) {
+
+    // Set thread and block size
+    unsigned int n_threads = 32;
+    unsigned int n_blocks = (unsigned int) ceil((floor) (imgwidth * imgheight) / n_threads);
+
+    clock_t start = clock();
+    extract_channels<<<n_blocks, n_threads>>>(d_out_yuv422, d_y_channel, d_u_channel, d_v_channel, imgwidth*imgheight);
+    cudaDeviceSynchronize();
+    clock_t end = clock();
+
+    double gpu_time = (double) (end-start) / CLOCKS_PER_SEC;
+
+    return gpu_time;
+}
+
+double yuv422_to_bgr (unsigned char* d_out_yuv422, uchar3 *d_out_bgr, unsigned int imgheight, unsigned int imgwidth) {
+
+    // Set thread and block size
+    unsigned int n_threads = 32;
+    unsigned int n_blocks = (unsigned int) ceil((floor) (imgwidth * imgheight) / n_threads);
+
+    clock_t start = clock();
+    yuv422tobgr<<<n_blocks, n_threads>>>(d_out_yuv422, d_out_bgr, imgheight*imgwidth);
+    cudaDeviceSynchronize();
+    clock_t end = clock();
+
+    double gpu_time = (double) (end-start) / CLOCKS_PER_SEC;
+
+    return gpu_time;
+}
+
 int main() {
+
+    // Load input file paths
+    vector<string> image_paths;
+    image_paths.push_back("./images/image_512x384.png");
+    image_paths.push_back("./images/image_720x540.png");
+    image_paths.push_back("./images/image_1024x768.png");
 
     string image_path = "./images/image_720x540.png";
 
@@ -38,10 +111,7 @@ int main() {
     const unsigned int imgheight = img.rows;
     const unsigned int imgwidth = img.cols;
 
-    cout << "Image height  =  " << imgheight << endl;
-    cout << "Image width   =  "  << imgwidth << endl;
-
-
+    cout << "Loaded " << imgwidth << " × " << imgheight << " image." << endl;
 
     // BGR to YUV444
     uchar3 *d_in;
@@ -52,20 +122,10 @@ int main() {
 
     cudaMemcpy(d_in, img.data, imgheight*imgwidth*sizeof(uchar3), cudaMemcpyHostToDevice);
 
-    dim3 threadsPerBlock(32, 32);
-    dim3 blocksPerGrid((imgwidth + threadsPerBlock.x - 1) / threadsPerBlock.x,
-        (imgheight + threadsPerBlock.y - 1) / threadsPerBlock.y);
+    double gpu_time = bgr_to_yuv444 (d_in, d_out_yuv444, imgheight, imgwidth);
 
-    clock_t start, end;
-    start = clock();
-    bgr2yuv444<<<blocksPerGrid, threadsPerBlock>>>(d_in, d_out_yuv444, imgwidth, imgheight);
-    cudaDeviceSynchronize();
-    end = clock();
-
-    double gpu_time = (double) (end-start) / CLOCKS_PER_SEC;
     cout.precision(12);
     cout << "Execution time of bgr2yuv444 kernel is:  "<< gpu_time << " sec." << endl;
-
 
 
 
@@ -73,15 +133,7 @@ int main() {
     unsigned char *d_out_yuv422;
     cudaMalloc((void**)&d_out_yuv422, imgheight*imgwidth*sizeof(unsigned char) * 2);
 
-    unsigned int n_threads = 32;
-    unsigned int n_blocks = (unsigned int) ceil((floor) (imgwidth * imgheight) / n_threads);
-
-    start = clock();
-    yuv444toyuv422<<<n_blocks, n_threads>>>(d_out_yuv444, d_out_yuv422, imgwidth*imgheight);
-    cudaDeviceSynchronize();
-    end = clock();
-
-    gpu_time = (double) (end-start) / CLOCKS_PER_SEC;
+    gpu_time = yuv444_to_yuv422 (d_out_yuv444, d_out_yuv422, imgheight, imgwidth);
     cout << "Execution time of yuv444toyuv422 kernel is:  "<< gpu_time << " sec." << endl;
 
     // Conversion to BGR using cvtColor in order to display/save the image
@@ -98,7 +150,6 @@ int main() {
 
 
 
-
     /// YUV422 to single separate channels
     unsigned char *d_y_channel;
     cudaMalloc((void**)&d_y_channel, imgheight*imgwidth*sizeof(unsigned char));
@@ -109,12 +160,7 @@ int main() {
     unsigned char *d_v_channel;
     cudaMalloc((void**)&d_v_channel, imgheight*imgwidth*sizeof(unsigned char));
 
-    start = clock();
-    extract_channels<<<n_blocks, n_threads>>>(d_out_yuv422, d_y_channel, d_u_channel, d_v_channel, imgwidth*imgheight);
-    cudaDeviceSynchronize();
-    end = clock();
-
-    gpu_time = (double) (end-start) / CLOCKS_PER_SEC;
+    gpu_time = extract_separate_channels(d_out_yuv422, d_y_channel, d_u_channel, d_v_channel, imgheight, imgwidth);
     cout << "Execution time of extract_channels kernel is:  "<< gpu_time << " sec." << endl;
 
     // Show/save all 3 channels separately
@@ -142,12 +188,7 @@ int main() {
     uchar3 *d_out_bgr;
     cudaMalloc((void**)&d_out_bgr, imgheight*imgwidth*sizeof(uchar3));
 
-    start = clock();
-    yuv422tobgr<<<n_blocks, n_threads>>>(d_out_yuv422, d_out_bgr, imgheight*imgwidth);
-    cudaDeviceSynchronize();
-    end = clock();
-
-    gpu_time = (double) (end-start) / CLOCKS_PER_SEC;
+    gpu_time = yuv422_to_bgr (d_out_yuv422, d_out_bgr, imgheight, imgwidth);
     cout << "Execution time of yuv422tobgr kernel is:  "<< gpu_time << " sec." << endl;
 
     Mat final_bgr_image(imgheight, imgwidth, CV_8UC3);
