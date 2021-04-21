@@ -2,8 +2,7 @@
 
 REQUIREMENTS
 
-OpenCV
-CUDA (version 10.2)
+OpenCV, CUDA (version 10.2)
 
 COMPILING
 
